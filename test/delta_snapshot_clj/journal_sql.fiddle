@@ -1,0 +1,72 @@
+(comment
+  (ns delta-snapshot-clj.journal-sql)
+  (require
+   '[clojure.core.reducers :as r]
+   '[delta-snapshot-clj.core :as core]
+   '[delta-snapshot-clj.io :as io]
+   '[delta-snapshot-clj.core-test :as core-test]
+   '[delta-snapshot-clj.io-test :as io-test]
+   '[delta-snapshot-clj.journal-sql :as j-sql]
+   '[delta-snapshot-clj.specs]
+   '[next.jdbc :as jdbc]
+   '[taoensso.timbre :refer [info]])
+  
+  (j-sql/drop-table)
+  (j-sql/create-or-truncate-table)
+  (j-sql/insert! (core-test/make-journal-row-simple-add))
+  (j-sql/insert! (core-test/make-journal-row-simple-modify))
+  (j-sql/select-all)
+  (j-sql/select-all-JournalRow)
+  (j-sql/select-all-EntityDeltaMessages)
+  ;(retrieve-newest-data-set-entity-by-id (journal/get-connection) subscription-data-set-id-test entity-id-simple)
+  ;(retrieve-newest-data-set-entity-by-id (journal/get-connection) 99 14)
+  ;(retrieve-newest-entities-excl-delta (journal/get-connection) subscription-data-set-id-test ds/delta-code-remove)
+  ;(retrieve-newest-entity-ids-excl-delta (journal/get-connection) subscription-data-set-id-test ds/delta-code-remove)
+  (into [] (j-sql/retrieve-snapshot (j-sql/get-connection) 2 32))
+  (j-sql/retrieve-newest-entities-excl-delta (j-sql/get-connection) 77 core/delta-code-remove)
+  (into [] (j-sql/retrieve-newest-entity-ids-excl-delta (j-sql/get-connection) 77 core/delta-code-remove))
+  (reduce conj [] (r/map j-sql/row->JournalRow (j-sql/retrieve-snapshot (j-sql/get-connection) 2 32)))
+  (into []
+        (r/map j-sql/row->JournalRow (j-sql/retrieve-snapshot (j-sql/get-connection) 2 22)))
+
+  (->> (j-sql/retrieve-snapshot (j-sql/get-connection) 2 6)
+       (r/map j-sql/row->JournalRow)
+       (into []))
+
+  (into [] (map j-sql/row->JournalRow) (j-sql/retrieve-snapshot (j-sql/get-connection) 2 6))
+
+  ;(with-open [conn (journal/get-connection)]
+  ;  (let [journal-io (io-test/make-journal-io conn)
+  ;        snapshot (io/retrieve-snapshot journal-io 22)]
+  ;    snapshot))
+  
+  ;(let [conn (journal/get-connection)
+  ;      journal-io (io-test/make-journal-io conn)
+  ;      snapshot (retrieve-snapshot journal-io 6)]
+  ;  (into [] snapshot))
+  
+  ;;;;;;;
+  (let [conn (j-sql/get-connection)
+        journal-operation (#'io-test/make-journal-operation conn)
+        snapshot (io/retrieve-snapshot journal-operation 16 :trace)]
+    (into [] snapshot))
+  (let [conn (j-sql/get-connection)
+        journal-operation (#'io-test/make-journal-operation conn)
+        full (#'delta-snapshot-clj.io/retrieve-full journal-operation io-test/subscription-data-set-id-test :trace)
+        _ (info "after io/retrieve-full")]
+    (into [] full))
+
+  (jdbc/with-transaction [tx datasource]
+    (j-sql/insert-tx! tx (core-test/make-journal-row-simple-add))
+    (j-sql/insert-tx! tx (core-test/make-journal-row-simple-modify))
+    (j-sql/insert-tx! tx (core-test/make-journal-row-simple-remove)))
+
+  :rcf)
+
+;(cache/execute-as-transaction
+;  (fn [tx]
+;    (do
+;      (cache/insert-tx! tx (make-cache-row-simple-add))
+;      (cache/insert-tx! tx (make-cache-row-simple-modify))
+;      ;(throw (ex-info "bailed!" {}))
+;      (cache/insert-tx! tx (make-cache-row-simple-remove)))))

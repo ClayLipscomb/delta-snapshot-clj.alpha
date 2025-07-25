@@ -12,3 +12,6 @@ pom.xml.asc
 .lein-failures
 .nrepl-port
 .cpcache/
+output.calva-repl
+.clj-kondo/*
+.vscode/settings.json
