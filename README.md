@@ -8,9 +8,9 @@ A publisher is a system of record that makes full data sets available via a quer
 
 ## Subscription
 
-A subscription represents a subscriber being registered for a specific publisher data set. A subscription also represents a data set that is particular to its subscriber. Even if two subscribers subscribe to an identical publisher data set, there are two distinct data sets, each with a unique data set id and delta history. Every subscription is represented by an instance of the [`SubscriptionConfig`](src\delta_snapshot_clj\subscription.clj) protocol.
+A subscription represents a subscriber being registered for a specific publisher data set. A subscription also represents a data set that is particular to its subscriber. Even if two subscribers subscribe to an identical publisher data set, there are two distinct data sets, each with a unique data set id and delta history. Every subscription is represented by an instance of the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol.
 
-*Entity* refers to a row retrieved in a publisher data set. Each entity should have an id accessible by a keyword provided in the [`SubscriptionConfig`](src\delta_snapshot_clj\subscription.clj) protocol. A publisher data set must be a reducible of entity hashmaps. Using records instead of hashmaps is recommended to improve performance.
+*Entity* refers to a row retrieved in a publisher data set. Each entity should have an id accessible by a keyword provided in the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol. A publisher data set must be a reducible of entity hashmaps. Using records instead of hashmaps is recommended to improve performance.
 
 ## Snapshot
 
@@ -48,9 +48,9 @@ Both `snapshot!` and `full!` return a record containing the reducible (IReduceIn
 
 ## Journal Table
 
-The consumer hosts a database used by the library. Only one table (with suggested naming *journal*) is required and it will be treated as append-only. The databse may be of any type permitting that the consumer can implement all operations in the [`JournalOperation`](src\delta_snapshot_clj\journal.clj) protocol. A single instance of `JournalOperation` provides for all publisher and subscriber scenarios. 
+The consumer hosts a database used by the library. Only one table (with suggested naming *journal*) is required and it will be treated as append-only. The databse may be of any type permitting that the consumer can implement all operations in the [`JournalOperation`](src/delta_snapshot_clj/journal.clj) protocol. A single instance of `JournalOperation` provides for all publisher and subscriber scenarios. 
 
-Examples for a SQL journal database can be found in [`delta-snapshot-clj.journal-sql`](test\delta_snapshot_clj\journal_sql.clj). It is the consumer's responsibility to create queries and index the journal table for query performance.
+Examples for a SQL journal database can be found in [`delta-snapshot-clj.journal-sql`](test/delta_snapshot_clj/journal_sql.clj). It is the consumer's responsibility to create queries and index the journal table for query performance.
 
 The journal table requires the following columns/attributes:
 
