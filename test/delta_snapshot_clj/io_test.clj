@@ -71,8 +71,8 @@
     (table-row->message [_ table-row]
       (journal-sql/row->EntityDeltaMessage table-row))
     ;; write operations
-    (insert-row! [_ transactable-connection journal-row]
-      (journal-sql/insert-tx! transactable-connection journal-row))
+    (insert-row! [_ transactable-conn journal-row]
+      (journal-sql/insert-tx! transactable-conn journal-row))
     ;; read operations
     (now [_]
       (Instant/now))

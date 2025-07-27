@@ -16,7 +16,7 @@
   ^PersistentHashMap entity-prv])
 
 (defprotocol JournalOperation
-  "All I/O operations for journal, that is hosted  the consumer of delta-snapshot."
+  "All I/O operations for journal hosted by the consumer of delta-snapshot."
   ;; mappers
   (table-row-entity-id-val
     [this table-row]
@@ -35,10 +35,10 @@
   ;; read operations
   (now
     ^Instant [this]
-    "Return Instant value of the journal's 'now' (current date & time).")
+    "Return Instant value of the journal database 'now' (current date & time).")
   (generate-new-snapshot-id
     [this]
-    "Generate id for a new snapshot id. A snapshot id must be unique across all subscription data sets.")
+    "Generate id for a new snapshot. A snapshot id must be unique across all subscription data sets.")
   (retrieve-newest-data-set-entity-by-id
     [this transactable-conn subscription-data-set-id entity-id]
     "Retrieve row native to journal table with the newest version of a data set entity within a transaction created 
@@ -50,9 +50,9 @@
   (retrieve-newest-data-set-entities-excluding-delta
     ^IReduceInit [this subscription-data-set-id exclude-delta-code]
     "Return IReduceInit that will retrieve rows from the journal that are the newest version of each entity in a 
-     data set, excluding those entities where the newest version is given delta state. Used to retrieve a 'full' data set.")
+     data set, excluding those entities where the newest version is a given delta state. Used to retrieve a full data set.")
   (retrieve-newest-data-set-entity-ids-excluding-delta
     ^IReduceInit [this transactable-conn subscription-data-set-id exclude-delta-code]
     "Return IReduceInit that will retrieve entity ids from the journal that are the newest version of each entity in a 
-     data set, excluding those entities where the newest version is given delta state. Executed within a transaction 
-     created for generating a snapshot."))
+     data set, excluding those ids where the newest version is a given delta state. Used to retrieve ids of full data set.
+     Executed within a transaction created for generating a snapshot."))

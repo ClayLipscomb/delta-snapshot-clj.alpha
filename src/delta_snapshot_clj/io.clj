@@ -200,7 +200,7 @@
 
   `journal-operation` - instance of `JournalOperation` protocol reified by consumer
   `subscription-config` - instance of `SubscriptionConfig` protocol reified by consumer
-  `transactable-conn` - a transactable connection (or container thereof) used by `JournalOperation` methods with such parameter
+  `transactable-conn` - a transactable connection (or container thereof) to be sent to `JournalOperation` methods with such parameter
   `opts` - map of the following optional parameters:
       `:logging-min-level` -
           Minimum log level of :trace, :debug, :info, :warn, :error, or :fatal (defaults to :fatal)"
@@ -215,7 +215,7 @@
 
   `journal-operation` - instance of `JournalOperation` protocol reified by consumer
   `subscription-config` - instance of `SubscriptionConfig` protocol reified by consumer
-  `transactable-conn` - a transactable connection (or container thereof) used by `JournalOperation` methods with such paramteer
+  `transactable-conn` - a transactable connection (or container thereof) to be sent to `JournalOperation` methods with such parameter
   `opts` - map of the following optional parameters:
       `:logging-min-level` -
           Minimum log level of :trace, :debug, :info, :warn, :error, or :fatal (defaults to :fatal)"

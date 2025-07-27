@@ -1,16 +1,16 @@
-# Delta Snapshot 
+# Delta Snapshot (experimental)
 
-Delta Snapshot is a Clojure integration library that enables a system of reference (a *subscriber*) to mirror a system of record (a *publisher*) data set via periodic, on-demand requests for deltas generated against the publisher data set. The library consumer hosts an append-only *journal* database (sql or no-sql) that persists each data set and its delta history; the consumer implements a protocol enabling the library to interface with the journal. Delta Snapshot adopts an inversion of the pub-sub pattern where the publisher is passive, the subscriber is active, and communication is synchronous.
+Delta Snapshot is a Clojure integration library that enables a system of reference (a *subscriber*) to mirror a system of record (a *publisher*) data set by making periodic, on-demand requests for deltas generated against the publisher data set. The library consumer hosts an append-only *journal* database (sql or no-sql) that persists each data set and its delta history; the consumer implements a protocol enabling the library to interface with the journal. Delta Snapshot adopts an inversion of the pub-sub pattern where the publisher is passive, the subscriber is active, and communication is synchronous.
 
 ## Publishers and Subscribers
 
-A publisher is a system of record that makes full data sets available via a query API. A subscriber is a system of reference that mirrors a publisher data set by making on-demand requests for deltas that have occurred in the publisher data set since the subscriber's previous request.
+A publisher is a system of record that makes full data sets available via a query API. A subscriber is a system of reference that mirrors a publisher data set by making on-demand requests for deltas that have occurred in the publisher data set since the subscriber's previous request. Delta Snapshot handles subscriber requests, pulls from the publisher, and generates deltas returned to the subscriber.
 
 ## Subscription
 
 A subscription represents a subscriber being registered for a specific publisher data set. A subscription also represents a data set that is particular to its subscriber. Even if two subscribers subscribe to an identical publisher data set, there are two distinct data sets, each with a unique data set id and delta history. Every subscription is represented by an instance of the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol.
 
-*Entity* refers to a row retrieved in a publisher data set. Each entity should have an id accessible by a keyword provided in the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol. A publisher data set must be a reducible of entity hashmaps. Using records instead of hashmaps is recommended to improve performance.
+An *entity* refers to a row retrieved for a subscriber from a publisher data set. Each entity should have an id accessible by a keyword defined in the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol. A publisher data set must be a reducible (`clojure.lang.IReduceInit`) of entity hashmaps. Using records instead of hashmaps is recommended to improve performance.
 
 ## Snapshot
 
@@ -20,11 +20,11 @@ A snapshot is the collection of deltas detected between a publisher data set and
 
 There are three types of deltas.
 
-| Delta  | Meaning                                       |
-| -------| ----------------------------------------------|
-| Add    | Entity has been added or re-added to data set |
-| Modify | Existing data set entity was modified         |
-| Remove | Entity was removed from data set              |
+| Delta  | Meaning                                     |
+| -------| --------------------------------------------|
+| Add    | Entity was added or re-added to data set    |
+| Modify | Entity already in the data set was modified |
+| Remove | Entity was removed from data set            |
 
 ## Subscriber Actions
 
@@ -42,13 +42,19 @@ Generate a snapshot of all deltas that have occurred since the most recent `snap
 
 Retrieve the deltas of any prior snapshot, while not generating a new snapshot. 
 
-### Query Parallelism
+### Parallelism
 
-Both `snapshot!` and `full!` return a record containing the reducible (IReduceInit) field `:delta-messages-reducible`; `retrieve-snapshot` directly returns a reducible. Each is a foldable of deltas retrieved from the journal. In order to optimize performance, `clojure.core.reducers/foldcat` should be used to retrieve instead of `clojure.core/into`. The former will execute in parallel, and the latter in serial. The parallelization occurs during the internal `clojure.core.reducers/map` used to convert a journal table row record to a message record.
+The use of parallelism is necessary to optimize performance. This is made possible by requiring that several protocol query methods return a reducible (`clojure.lang.IReduceInit`) instead of a collection like a vector. If the journal is a SQL database, this can be easily implemented using the next.jdbc [`plan`](https://github.com/seancorfield/next-jdbc/blob/develop/doc/tips-and-tricks.md#reducing-and-folding-with-plan)
+
+In the [`SubscriptionConfig`](src/delta_snapshot_clj/subscription.clj) protocol, a reducible must be returned by `pull-publisher-data-set`.
+
+In the [`JournalOperation`](src/delta_snapshot_clj/journal.clj) protocol, a reducible must be returned by `retrieve-data-set-snapshot`, `retrieve-newest-data-set-entities-excluding-delta` and `retrieve-newest-data-set-entity-ids-excluding-delta`.
+
+Both `snapshot!` and `full!` return a record containing the reducible field `:delta-messages-reducible`; `retrieve-snapshot` directly returns a reducible. Each is a foldable of deltas retrieved from the journal. In order to activate parallelism, `clojure.core.reducers/foldcat` should be used to retrieve instead of `clojure.core/into`. The former will execute in parallel, and the latter in serial. The parallelism occurs during the internal `clojure.core.reducers/map` used to convert a journal table row record to a message record.
 
 ## Journal Table
 
-The consumer hosts a database used by the library. Only one table (with suggested naming *journal*) is required and it will be treated as append-only. The databse may be of any type permitting that the consumer can implement all operations in the [`JournalOperation`](src/delta_snapshot_clj/journal.clj) protocol. A single instance of `JournalOperation` provides for all publisher and subscriber scenarios. 
+The consumer hosts a database used by the library. Only one table (with suggested naming *journal*) is required and it will be treated as append-only. The database may be of any type permitting that the consumer can implement all operations in the [`JournalOperation`](src/delta_snapshot_clj/journal.clj) protocol. A common implementation of each `JournalOperation` method will provide for all publisher and subscriber scenarios. The protocol will be reified with a database connection each time a subscriber action is initiated. When executing `snapshot!` or `full!`, the consumer will send a parameter for a database connection within a transaction; the transaction is used to persist the snapshot deltas.
 
 Examples for a SQL journal database can be found in [`delta-snapshot-clj.journal-sql`](test/delta_snapshot_clj/journal_sql.clj). It is the consumer's responsibility to create queries and index the journal table for query performance.
 
@@ -74,10 +80,22 @@ The three deltas types are persisted in columns in the following manner:
 | MOD               | new version of modified entity  | previous value of entity-cur |
 | RMV               | null                            | entity-cur at time of remove |
 
+## Delta Message
+
+The consumer will define a record to contain the entity delta message returned to the subscriber. The message record requires the following fields:
+
+| Name  | Type              | Description                                                |
+| ----- | ----------------- | ---------------------------------------------------------- |
+| id    | Untyped           | Identifies entity within the publisher data set            |
+| delta | String            | ADD, MOD or RMV                                            |
+| inst  | Instant           | Instant when delta was detected against publisher data set |
+| cur   | PersistentHashMap | Current/latest version of complete entity                  |
+| prv   | PersistentHashMap | Previous version of complete entity                        |
+
 ## Optional Tables
 
 The consumer may opt to maintain an additional *snapshot* table. A row would be inserted before every call to `snapshot!` or `full!`. This table would provide the benefits of tracking snapshots in progress and logging snapshots that generated no deltas. Minimal suggested columns are snapshot-id, subscription-data-set-id, status and timestamp.
 
-## Pub-Sub Data
+## Publisher/Subscriber Configuration
 
 It is responsibility of the consumer to maintain the many-to-many relationships of publishers and subscribers.
