@@ -14,4 +14,5 @@ pom.xml.asc
 .cpcache/
 output.calva-repl
 .clj-kondo/*
+.lsp/*
 .vscode/settings.json
